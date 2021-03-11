@@ -15,7 +15,6 @@ class _HomeScreenState extends State<HomeScreen> {
     SearchScreen(),
     FavouriteScreen(),
     UserProfile(),
-
   ];
 
   double xOffset = 0;
@@ -26,8 +25,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool closeTopContainer = false;
 
   int _selectedIndex = 0;
-
-
 
   void _onItemTapped(int index) {
     setState(() {
@@ -45,18 +42,20 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: kBackgroundColor,
           appBar: AppBar(
             backgroundColor: kBackgroundColor,
-            leading: isDrawerOpen
-                ? GestureDetector(
-                    onTap: () {
-                      setState(() {
 
+            ///Removed gesture detector to IconButton for more [TapTargetSize]
+            leading: isDrawerOpen
+                ? IconButton(
+                    padding: EdgeInsets.only(left: 30),
+                    onPressed: () {
+                      setState(() {
                         xOffset = 0;
                         yOffset = 0;
                         scaleFactor = 1;
                         isDrawerOpen = false;
                       });
                     },
-                    child: Icon(
+                    icon: Icon(
                       Icons.arrow_back_ios,
                       size: 32,
                       color: Colors.red,

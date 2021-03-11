@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_audio_query/flutter_audio_query.dart';
 import 'package:flutter_media_notification/flutter_media_notification.dart';
 import 'package:favorite_button/favorite_button.dart';
+import 'package:fluttone_music/model/hive_model.dart';
 import 'package:fluttone_music/screen/headerBackground.dart';
 import 'package:fluttone_music/utilities/constants.dart';
+import 'package:hive/hive.dart';
 import 'package:just_audio/just_audio.dart';
 
 class CustomBody extends StatefulWidget {
@@ -25,8 +29,12 @@ class CustomBodyState extends State<CustomBody> {
 
   final AudioPlayer player = AudioPlayer();
 
+  StreamSubscription mediaPlayer;
+
   void initState() {
     super.initState();
+    initiateHive();
+    mediaPlayer = player.positionStream.listen((event) => event);
     setSong(widget.songInfo);
     MediaNotification.setListener('pause', () {
       setState(() {
@@ -56,10 +64,12 @@ class CustomBodyState extends State<CustomBody> {
     super.dispose();
     hideNotfication();
     player?.dispose();
+    mediaPlayer?.cancel();
   }
 
   void setSong(SongInfo songInfo) async {
     widget.songInfo = songInfo;
+
     currentNotificaton();
     await player.setUrl(widget.songInfo.uri);
     currentValue = minimumValue;
@@ -71,14 +81,13 @@ class CustomBodyState extends State<CustomBody> {
 
     isPlaying = false;
     changeStatus();
-    player.positionStream.listen((duration) {
-      currentValue = duration.inMilliseconds.toDouble();
-      setState(() {
-        currentTime = getDuration(currentValue);
-        if (currentValue >= maximumValue) {
-          widget.changeTrack(true);
-        }
-      });
+    mediaPlayer.onData((data) {
+      currentValue = data.inMilliseconds.toDouble();
+      currentTime = getDuration(currentValue);
+      setState(() {});
+      if (currentValue >= maximumValue) {
+        widget.changeTrack(true);
+      }
     });
   }
 
@@ -101,8 +110,6 @@ class CustomBodyState extends State<CustomBody> {
         .map((e) => e.remainder(60).toString().padLeft(2, '0'))
         .join(':');
   }
-
-
 
   //background play notification
   void currentNotificaton() {
@@ -132,6 +139,12 @@ class CustomBodyState extends State<CustomBody> {
     MediaNotification.hideNotification();
   }
 
+  var savedList;
+  Future initiateHive() async {
+    ///Ref-[1129]
+    ///Creating a HiveBox to Store data
+    savedList = await Hive.openBox('myBox');
+  }
 
   Widget build(BuildContext context) {
     Size size = MediaQuery.of(context).size;
@@ -156,7 +169,8 @@ class CustomBodyState extends State<CustomBody> {
                       value: currentValue,
                       onChanged: (value) {
                         currentValue = value;
-                        player.seek(Duration(milliseconds: currentValue.round()));
+                        player
+                            .seek(Duration(milliseconds: currentValue.round()));
                       },
                     ),
                   ),
@@ -288,12 +302,26 @@ class CustomBodyState extends State<CustomBody> {
                     ),
                     Positioned(
                       right: 0,
-                      child: FavoriteButton(
-                        isFavorite: false,
-                        valueChanged: (_isFavorite) {
-                          print('Is Favorite : $_isFavorite');
-                        },
-                      ),
+                      child: savedList != null
+                          ? FavoriteButton(
+                              isFavorite:
+                                  savedList.keys.contains(widget.songInfo.id),
+                              valueChanged: (_isFavorite) {
+                                if (_isFavorite) {
+                                  ///Initializing [SongPlayList] and the added to the box
+                                  var songFav = SongPlayList()
+                                    ..songInfo = widget.songInfo.id;
+
+                                  ///Grabbed the songId, so that the song can be identified in the [FavouriteScreen]
+                                  savedList.put(widget.songInfo.id, songFav);
+                                  print(songFav);
+                                } else {
+                                  savedList.delete(widget.songInfo.id);
+                                  print(savedList.values.length);
+                                }
+                              },
+                            )
+                          : SizedBox(),
                     ),
                   ],
                 ),
@@ -305,8 +333,9 @@ class CustomBodyState extends State<CustomBody> {
                 padding: EdgeInsets.only(top: 40),
                 child: Text(
                   widget.songInfo.title,
-                  style:kSongTitile,
-              ),),
+                  style: kSongTitile,
+                ),
+              ),
               // SizedBox(
               //   height: size.height * 0.1,
               // ),
